@@ -41,12 +41,46 @@ done
 # schema.sql only CREATEs IF NOT EXISTS, so re-running is harmless and
 # bocusto_luthier is never referenced.
 
+# Reads KEY=value from an env file, tolerating quotes and CRLF.
+env_get() { grep -E "^$1=" "$2" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"; }
+
+say "Connecting to MySQL"
+
+# Prefer the credentials the Luthier backend already uses: they are known to
+# work, and they are the same account that must later read bocusto_luthier.users
+# for shared administrator logins. Asking for the root password is the fallback.
+DB_USER=""
+DB_PASSWORD=""
+if [ -f "$LUTHIER_ENV" ]; then
+  DB_USER="$(env_get DB_USER "$LUTHIER_ENV")"
+  DB_PASSWORD="$(env_get DB_PASSWORD "$LUTHIER_ENV")"
+  [ -n "$DB_USER" ] && echo "    using DB_USER=$DB_USER from $LUTHIER_ENV"
+fi
+
+# MYSQL_PWD keeps the password out of the process list and off the screen.
+mysql_run() {
+  if [ -n "$DB_PASSWORD" ]; then MYSQL_PWD="$DB_PASSWORD" mysql -u "$DB_USER" "$@"
+  else mysql -u "$DB_USER" "$@"; fi
+}
+
+if [ -z "$DB_USER" ] || ! mysql_run -e 'SELECT 1' >/dev/null 2>&1; then
+  [ -n "$DB_USER" ] && warn "those credentials were rejected — enter another account"
+  read -rp  "MySQL user [root]: " DB_USER; DB_USER="${DB_USER:-root}"
+  read -rsp "MySQL password for $DB_USER (blank if none): " DB_PASSWORD; echo
+  mysql_run -e 'SELECT 1' >/dev/null 2>&1 || die "cannot connect to MySQL as '$DB_USER'"
+fi
+
 say "Creating the bocusto_guitars database"
-read -rsp "MySQL root password (blank if none): " MYSQL_PW; echo
-if [ -n "$MYSQL_PW" ]; then
-  mysql -u root -p"$MYSQL_PW" < "$SRC/backend/schema.sql"
-else
-  mysql -u root < "$SRC/backend/schema.sql"
+if ! mysql_run < "$SRC/backend/schema.sql"; then
+  die "'$DB_USER' cannot create the database. As a MySQL administrator, run:
+
+    CREATE DATABASE IF NOT EXISTS bocusto_guitars
+      DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    GRANT ALL PRIVILEGES ON bocusto_guitars.* TO '$DB_USER'@'localhost';
+    GRANT SELECT ON bocusto_luthier.users TO '$DB_USER'@'localhost';
+    FLUSH PRIVILEGES;
+
+  then run this script again."
 fi
 
 # --- 2. backend -------------------------------------------------------------
@@ -65,7 +99,7 @@ else
   # Reuse the Luthier JWT_SECRET so one administrator login covers both sites.
   JWT_SECRET=""
   if [ -f "$LUTHIER_ENV" ]; then
-    JWT_SECRET="$(grep -E '^JWT_SECRET=' "$LUTHIER_ENV" | head -1 | cut -d= -f2-)"
+    JWT_SECRET="$(env_get JWT_SECRET "$LUTHIER_ENV")"
   fi
   if [ -z "$JWT_SECRET" ]; then
     warn "Could not read JWT_SECRET from $LUTHIER_ENV — generating a NEW one."
@@ -75,13 +109,7 @@ else
     echo "    reusing the Bocusto Luthier JWT_SECRET"
   fi
 
-  # Same credentials the Luthier backend uses, so the cross-database read of
-  # bocusto_luthier.users is already permitted.
-  DB_USER="$(grep -E '^DB_USER=' "$LUTHIER_ENV" 2>/dev/null | head -1 | cut -d= -f2- || true)"
-  DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$LUTHIER_ENV" 2>/dev/null | head -1 | cut -d= -f2- || true)"
-  DB_USER="${DB_USER:-root}"
-  DB_PASSWORD="${DB_PASSWORD:-$MYSQL_PW}"
-
+  # DB_USER / DB_PASSWORD were resolved and verified in step 1.
   umask 077
   cat > "$API/.env" <<EOF
 PORT=$PORT
