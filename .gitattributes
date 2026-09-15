@@ -1,0 +1,7 @@
+# Shell scripts run on the Linux VPS. If Windows CRLF endings ever reach the
+# blob, bash fails with "bad interpreter: /usr/bin/env bash^M", so pin them.
+*.sh text eol=lf
+
+# Read by MySQL and nginx on the server; keep them LF for the same reason.
+*.sql text eol=lf
+nginx.conf text eol=lf

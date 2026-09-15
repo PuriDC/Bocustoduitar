@@ -1,0 +1,63 @@
+# Bocusto Guitars — deploys alongside the Bocusto Luthier stack on one VPS.
+#
+# There is deliberately NO `db` service here: both sites share the MySQL
+# container that the Bocusto Luthier compose file already runs
+# (`bocusto_luthier_mysql`). This stack joins that container's network and
+# talks to its own `bocusto_guitars` database on it.
+#
+# First run, in order:
+#   1. docker compose -f ../Bocustoguitar_Luthier/docker-compose.yml up -d db
+#   2. docker exec -i bocusto_luthier_mysql mysql -uroot < backend/schema.sql
+#   3. docker compose up -d --build
+#   4. docker compose exec backend node src/scripts/createAdmin.js <user> <email> <password>
+#      (skip step 4 if you will sign in with an existing Bocusto Luthier admin)
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bocusto_guitars_backend
+    restart: always
+    ports:
+      - '4100:4000'
+    environment:
+      - PORT=4000
+      - DB_HOST=bocusto_luthier_mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=
+      - DB_NAME=bocusto_guitars
+      # Accept Bocusto Luthier admin accounts. Blank this out to keep the two
+      # sites' logins completely separate.
+      - SHARED_USERS_DB=bocusto_luthier
+      # MUST match the Bocusto Luthier backend's JWT_SECRET for one sign-in to
+      # work across both admin panels. Override it from a .env file or your
+      # deployment secrets — do not ship this placeholder.
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET before deploying}
+      - JWT_EXPIRES_IN=24h
+    networks:
+      - shared
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bocusto_guitars_frontend
+    restart: always
+    ports:
+      # Point the bocustoguitars domain here in your reverse proxy; the Luthier
+      # site keeps 3000 for its own domain.
+      - '3100:80'
+    depends_on:
+      - backend
+    networks:
+      - shared
+
+networks:
+  # The network the Bocusto Luthier compose project creates for its database.
+  # Verify the name with `docker network ls` — Compose prefixes it with the
+  # project directory, so it is usually <folder>_default.
+  shared:
+    external: true
+    name: bocustoguitar_luthier_default

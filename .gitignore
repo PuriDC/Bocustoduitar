@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# Local tooling, not part of the deployment
+.claude/
+.mcp.json
+
+# Holds JWT_SECRET and database credentials — never commit it.
+.env
+.env.local
+backend/.env
+frontend/.env

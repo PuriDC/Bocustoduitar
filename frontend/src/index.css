@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+}
+
+/* ===== Admin portal =====
+   The public site is dark and serif; the admin follows the Bocusto Luthier
+   admin instead — light canvas, Hanken Grotesk, Thai in Noto Sans Thai Looped.
+   Scoped to .admin-portal so none of it leaks into the public pages, and the
+   live preview inside the admin re-asserts the public fonts (see .site-preview). */
+.admin-portal,
+.admin-portal *:not(.material-symbols-outlined) {
+  font-family: "Hanken Grotesk", "Noto Sans Thai Looped", sans-serif;
+}
+
+.admin-portal .material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+}
+
+/* The preview renders the real public components, so it must keep their type. */
+.site-preview,
+.site-preview *:not(.material-symbols-outlined) {
+  font-family: inherit;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.custom-scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.text-technical {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(212, 169, 74, 0.06), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 20%, rgba(122, 151, 163, 0.04), transparent 55%), #0a0806;
+}
+
+.fade-line {
+  background: linear-gradient(90deg, transparent, rgba(212, 169, 74, 0.4), transparent);
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Image scrims. .tonal-stack darkens from mid to heavy, .tonal-fade from clear to heavy. */
+.tonal-stack {
+  background: linear-gradient(to bottom, rgba(10, 8, 6, 0.4), rgba(10, 8, 6, 0.9));
+}
+
+.tonal-fade {
+  background: linear-gradient(to bottom, rgba(10, 8, 6, 0) 0%, rgba(10, 8, 6, 0.85) 100%);
+}
+
+.sidebar-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Scoped grain — same noise as .grain-overlay but confined to its own box. */
+.grain-texture {
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.card-hover {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.7s ease;
+}
+.btn-shine:hover::after {
+  left: 125%;
+}
+
+::selection {
+  background: #d4a94a;
+  color: #0a0806;
+}
+
+.number-serif {
+  font-family: "Cormorant Garamond", serif;
+  font-style: italic;
+}
