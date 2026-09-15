@@ -60,6 +60,10 @@ cd "$SRC/frontend"
 npm ci
 npm run build
 rsync -a --delete $DRY_RUN "$SRC/frontend/dist/" "$WEB/"
+# nginx serves these as www-data; rsync preserves whatever mode the build left.
+# Written as an if, not `[ ] && cmd`: under `set -e` a false test at the end of
+# a list aborts the script, which would break --dry-run.
+if [ -z "$DRY_RUN" ]; then chmod -R a+rX "$WEB"; fi
 
 # --- 3. backend -------------------------------------------------------------
 

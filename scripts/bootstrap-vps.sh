@@ -116,8 +116,11 @@ else
   fi
 
   # DB_USER / DB_PASSWORD were resolved and verified in step 1.
-  umask 077
-  cat > "$API/.env" <<EOF
+  # The restrictive umask is confined to this subshell: setting it for the rest
+  # of the script would leave the built frontend unreadable by the nginx worker.
+  (
+    umask 077
+    cat > "$API/.env" <<EOF
 PORT=$PORT
 DB_HOST=localhost
 DB_PORT=3306
@@ -128,6 +131,7 @@ SHARED_USERS_DB=$SHARED_DB
 JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=24h
 EOF
+  )
   chmod 600 "$API/.env"
 fi
 
@@ -138,6 +142,9 @@ cd "$SRC/frontend"
 npm ci
 npm run build
 rsync -a --delete "$SRC/frontend/dist/" "$WEB/"
+# nginx serves these as www-data, so they must be world-readable regardless of
+# the umask npm happened to build under.
+chmod -R a+rX "$WEB"
 
 # --- 4. pm2 -----------------------------------------------------------------
 
@@ -196,6 +203,7 @@ server {
     }
 }
 EOF
+  chmod 644 "$SITE"
   ln -sf "$SITE" /etc/nginx/sites-enabled/bocustoguitars
 fi
 
