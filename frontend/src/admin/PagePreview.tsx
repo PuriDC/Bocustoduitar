@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { PreviewContentProvider } from "../content/ContentContext";
 import type { ContentTree, PageKey } from "../content/defaults";
@@ -12,9 +12,14 @@ import Order from "../pages/Order";
 import Gallery from "../pages/Gallery";
 import Events from "../pages/Events";
 import Contact from "../pages/Contact";
+import PreviewFrame from "./components/PreviewFrame";
 
-/** Width the public site is designed against; the preview scales down from it. */
-const DESIGN_WIDTH = 1440;
+export type Viewport = "desktop" | "mobile";
+
+/** CSS widths the preview frame is given; media queries resolve against these. */
+const DESIGN_WIDTH: Record<Viewport, number> = { desktop: 1440, mobile: 414 };
+/** What `100vh` means inside the frame — a plausible device height, not the content height. */
+const DESIGN_HEIGHT: Record<Viewport, number> = { desktop: 900, mobile: 896 };
 
 const PAGE_COMPONENTS: Record<PageKey, () => JSX.Element> = {
   common: Home,
@@ -28,7 +33,7 @@ const PAGE_COMPONENTS: Record<PageKey, () => JSX.Element> = {
   contact: Contact
 };
 
-const ROUTE_FOR_PAGE: Record<PageKey, string> = {
+export const ROUTE_FOR_PAGE: Record<PageKey, string> = {
   common: "/",
   home: "/",
   about: "/about",
@@ -44,68 +49,57 @@ type Props = {
   page: PageKey;
   /** Published content with the current unsaved edits already applied. */
   content: ContentTree;
+  viewport: Viewport;
 };
 
 /**
  * Renders the real public page components — not a mock — against the draft
  * content, so what the editor sees is exactly what visitors will get.
- *
- * The scaled wrapper is deliberate: a CSS transform makes the wrapper the
- * containing block for `position: fixed`, which keeps the site's fixed navbar
- * inside the preview panel instead of pinning it to the browser window.
  */
-export default function PagePreview({ page, content }: Props) {
+export default function PagePreview({ page, content, viewport }: Props) {
   const Page = PAGE_COMPONENTS[page];
-  const containerRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.5);
-  const [stageHeight, setStageHeight] = useState(900);
+  const width = DESIGN_WIDTH[viewport];
 
-  // Fit the 1440px design to whatever width the preview column has.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  const [height, setHeight] = useState(900);
+
+  // Fit the frame to the panel. Mobile is capped at 1:1 so it is not blown up
+  // past its real size on a wide screen.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
-      setScale(entry.contentRect.width / DESIGN_WIDTH);
+      setScale(Math.min(entry.contentRect.width / width, viewport === "mobile" ? 1 : 1.5));
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [width, viewport]);
 
-  // Reserve the scaled height so the panel scrolls over the whole page.
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setStageHeight(entry.contentRect.height);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [page, content]);
+  const handleHeightChange = useCallback((next: number) => setHeight(next), []);
 
   return (
-    <div ref={containerRef} className="w-full" style={{ height: stageHeight * scale }}>
-      <div
-        className="site-preview bg-background text-on-surface font-body select-none pointer-events-none"
-        style={{
-          width: DESIGN_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          // Contains the site's fixed navbar within this box.
-          contain: "layout"
-        }}
-      >
-        <div ref={stageRef}>
-          <PreviewContentProvider content={content}>
-            <MemoryRouter initialEntries={[ROUTE_FOR_PAGE[page]]}>
-              <Navbar />
-              <main>
-                <Page />
-              </main>
-              <Footer />
-            </MemoryRouter>
-          </PreviewContentProvider>
-        </div>
+    <div ref={containerRef} className="w-full flex justify-center">
+      {/* Reserves the scaled footprint; the frame itself is transformed. */}
+      <div style={{ width: width * scale, height: height * scale }}>
+        <PreviewFrame
+          width={width}
+          viewportHeight={DESIGN_HEIGHT[viewport]}
+          scale={scale}
+          onHeightChange={handleHeightChange}
+        >
+          <div className="site-preview bg-background text-on-surface font-body select-none">
+            <PreviewContentProvider content={content}>
+              <MemoryRouter initialEntries={[ROUTE_FOR_PAGE[page]]}>
+                <Navbar />
+                <main>
+                  <Page />
+                </main>
+                <Footer />
+              </MemoryRouter>
+            </PreviewContentProvider>
+          </div>
+        </PreviewFrame>
       </div>
     </div>
   );
