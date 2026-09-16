@@ -25,6 +25,15 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+/**
+ * Loopback by default: nginx is the only thing that should reach this process,
+ * and binding 0.0.0.0 published the API — and its plaintext login endpoint — on
+ * the server's public address, bypassing TLS and every header nginx adds.
+ * Containers need 0.0.0.0 to be reachable through a port mapping, so the
+ * compose file sets HOST explicitly.
+ */
+const HOST = process.env.HOST || "127.0.0.1";
+
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
@@ -43,8 +52,8 @@ app.use("/api/newsletter", newsletterRouter);
 app.use("/api/commissions", commissionsRouter);
 app.use("/api/contact", contactRouter);
 
-app.listen(PORT, async () => {
-  console.log(`Bocusto Guitars API listening on http://localhost:${PORT}`);
+app.listen(PORT, HOST, async () => {
+  console.log(`Bocusto Guitars API listening on http://${HOST}:${PORT}`);
   if (await isReachable()) {
     console.log(`Database ${process.env.DB_NAME || "bocusto_guitars"} connected.`);
     if (SHARED_USERS_DB) {

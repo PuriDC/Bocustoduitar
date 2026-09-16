@@ -23,6 +23,9 @@ services:
       - '4100:4000'
     environment:
       - PORT=4000
+      # Inside a container the port mapping is the boundary, so bind all
+      # interfaces here. On the VPS the app stays on loopback behind nginx.
+      - HOST=0.0.0.0
       - DB_HOST=bocusto_luthier_mysql
       - DB_PORT=3306
       - DB_USER=root
