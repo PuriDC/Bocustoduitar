@@ -65,12 +65,20 @@ run ufw allow 443/tcp comment 'HTTPS'
 
 # --- 2. verify SSH really is in the rule set before switching on ------------
 
+# `ufw status` prints nothing but "Status: inactive" while the firewall is off,
+# so it cannot be used to confirm a rule exists before switching on — that is
+# exactly the moment the check matters. `ufw show added` lists the rule set
+# either way.
 if [ -z "$DRY_RUN" ]; then
+  RULES="$(ufw show added 2>/dev/null || true)"
+  [ -n "$RULES" ] || RULES="$(ufw status 2>/dev/null || true)"
+
   for p in $SSH_PORTS; do
-    ufw status | grep -qE "(^|[[:space:]])$p/tcp" \
-      || die "SSH port $p is not in the ufw rule set — refusing to enable the firewall"
+    printf '%s\n' "$RULES" | grep -qE "(^|[[:space:]])$p/tcp([[:space:]]|$)" \
+      || die "SSH port $p is not in the ufw rule set — refusing to enable the firewall.
+  Inspect it yourself with:  ufw show added"
   done
-  echo "    SSH rule confirmed present"
+  echo "    SSH rule confirmed present in the ufw rule set"
 fi
 
 # --- 3. deny the three exposed services -------------------------------------
