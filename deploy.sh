@@ -126,10 +126,13 @@ if [ -z "$DRY_RUN" ]; then
     die "deploy finished but the API is down (pm2 logs $PM2_APP)"
   fi
   echo "    $HEALTH"
-  case "$HEALTH" in
-    *'"sharedUsers":{"status":"ok"'*) : ;;
-    *) warn "bocustotonewood.com administrators cannot sign in — see DEPLOYMENT.md" ;;
-  esac
+
+  # The public probe deliberately says nothing but {"status":"ok"}, so ask the
+  # database directly rather than reading a field that is no longer published.
+  say "Shared administrator logins"
+  if (cd "$API" && node src/scripts/checkShared.js); then :; else
+    warn "bocustotonewood.com administrators cannot sign in — see DEPLOYMENT.md"
+  fi
 fi
 
 say "Done"

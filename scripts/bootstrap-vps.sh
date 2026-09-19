@@ -162,15 +162,14 @@ sleep 3
 HEALTH="$(curl -fsS "http://127.0.0.1:$PORT/api/health" || true)"
 [ -n "$HEALTH" ] || die "backend did not answer on port $PORT โ€” check: pm2 logs $PM2_APP"
 echo "    $HEALTH"
-case "$HEALTH" in
-  *'"sharedUsers":{"status":"ok"'*)
-    echo "    shared administrator logins are readable" ;;
-  *)
-    warn "The backend cannot read $SHARED_DB.users, so the bocustotonewood.com"
-    warn "administrators will NOT be able to sign in. Grant access and restart:"
-    warn "  GRANT SELECT ON $SHARED_DB.users TO '$DB_USER'@'localhost'; FLUSH PRIVILEGES;"
-    warn "  pm2 restart $PM2_APP" ;;
-esac
+
+# The public probe reports liveness only; ask the database about the shared
+# accounts rather than a field the endpoint no longer publishes.
+say "Shared administrator logins"
+if (cd "$API" && node src/scripts/checkShared.js); then :; else
+  warn "The bocustotonewood.com administrators will NOT be able to sign in."
+  warn "Grant access and restart:  pm2 restart $PM2_APP"
+fi
 
 # --- 5. nginx ---------------------------------------------------------------
 

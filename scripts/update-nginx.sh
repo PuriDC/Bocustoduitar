@@ -106,6 +106,19 @@ else
   fi
 fi
 
+# The first version of the site config set three of these headers itself. With
+# the snippet also setting them nginx emits each twice — "X-Frame-Options:
+# DENY,DENY" — so drop the originals and leave the snippet as the one source.
+if grep -qE '^[[:space:]]*add_header (X-Frame-Options|X-Content-Type-Options|Referrer-Policy)' "$SITE"; then
+  say "Removing the duplicated header lines from $SITE"
+  if [ -n "$DRY_RUN" ]; then
+    grep -nE '^[[:space:]]*add_header (X-Frame-Options|X-Content-Type-Options|Referrer-Policy)' "$SITE" \
+      | sed 's/^/   (dry run) would delete line /'
+  else
+    sed -i -E '/^[[:space:]]*add_header (X-Frame-Options|X-Content-Type-Options|Referrer-Policy)/d' "$SITE"
+  fi
+fi
+
 # --- 3. test, then reload ---------------------------------------------------
 
 if [ -n "$DRY_RUN" ]; then
