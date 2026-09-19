@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PageKey } from "../../content/defaults";
+import logo from "../../assets/bocusto-logo.png";
 
 /**
  * The sister site on the same VPS. Its admin is not a route — it is React state
@@ -17,9 +18,15 @@ const SISTER_SITE = {
 
 export type AdminNavItem = { key: PageKey; label: string; icon: string; path: string };
 
-/** Sidebar order and icons. "common" is the shared chrome, not a page of its own. */
+/**
+ * Sidebar order and icons — one entry per editable page.
+ *
+ * The shared chrome ("common": the navigation labels, footer, brand and
+ * language toggle) is deliberately absent. Its content still ships in
+ * `defaults.ts` and any override already saved for it is still applied; it
+ * simply has no row here, so it cannot be edited from the panel.
+ */
 export const ADMIN_PAGES: AdminNavItem[] = [
-  { key: "common", label: "เมนู & ท้ายเว็บ", icon: "dashboard_customize", path: "/" },
   { key: "home", label: "หน้าแรก", icon: "home", path: "/" },
   { key: "about", label: "เกี่ยวกับเรา", icon: "info", path: "/about" },
   { key: "models", label: "รุ่นกีตาร์", icon: "queue_music", path: "/models" },
@@ -47,15 +54,11 @@ export default function AdminSidebar({ current, onSelect, onLogout, editedPages,
   return (
     <aside className="fixed left-0 top-0 h-full w-[260px] z-50 flex flex-col bg-[#16181a] text-slate-300">
       <div className="px-5 pt-6 pb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#f2ca50] flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[#16181a] text-xl leading-none">music_note</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-white font-bold text-[15px] leading-tight truncate">Bocusto Guitars</p>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold">ระบบจัดการเนื้อหา</p>
-          </div>
-        </div>
+        {/* The wordmark replaces both the placeholder tile and the set name —
+            it already reads as "Bocusto Guitars", so repeating it in type
+            beside the image would be the same words twice. */}
+        <img src={logo} alt="Bocusto Guitars" width={129} height={50} className="h-10 w-auto mb-2.5" />
+        <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold">ระบบจัดการเนื้อหา</p>
       </div>
 
       <p className="px-6 pb-2 text-[10px] uppercase tracking-[0.14em] text-slate-600 font-bold">หน้าเว็บไซต์</p>

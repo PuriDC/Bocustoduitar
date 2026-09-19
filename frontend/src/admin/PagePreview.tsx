@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { PreviewContentProvider } from "../content/ContentContext";
 import type { ContentTree, PageKey } from "../content/defaults";
+import type { Lang } from "../content/lang";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Home from "../pages/Home";
@@ -49,6 +50,8 @@ type Props = {
   page: PageKey;
   /** Published content with the current unsaved edits already applied. */
   content: ContentTree;
+  /** The language `content` was resolved in, so the chrome matches it. */
+  lang: Lang;
   viewport: Viewport;
 };
 
@@ -56,7 +59,7 @@ type Props = {
  * Renders the real public page components — not a mock — against the draft
  * content, so what the editor sees is exactly what visitors will get.
  */
-export default function PagePreview({ page, content, viewport }: Props) {
+export default function PagePreview({ page, content, lang, viewport }: Props) {
   const Page = PAGE_COMPONENTS[page];
   const width = DESIGN_WIDTH[viewport];
 
@@ -88,8 +91,8 @@ export default function PagePreview({ page, content, viewport }: Props) {
           scale={scale}
           onHeightChange={handleHeightChange}
         >
-          <div className="site-preview bg-background text-on-surface font-body select-none">
-            <PreviewContentProvider content={content}>
+          <div lang={lang} className="site-preview bg-background text-on-surface font-body select-none">
+            <PreviewContentProvider content={content} lang={lang}>
               <MemoryRouter initialEntries={[ROUTE_FOR_PAGE[page]]}>
                 <Navbar />
                 <main>

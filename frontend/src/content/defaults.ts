@@ -16,7 +16,9 @@ export const defaultContent = {
     brand: {
       namePrimary: "Bocusto",
       nameSecondary: "Guitars",
-      languageToggle: "EN / TH",
+      languageEn: "EN",
+      languageTh: "TH",
+      languageSwitchLabel: "Switch language",
       cartCount: "2"
     },
     nav: {

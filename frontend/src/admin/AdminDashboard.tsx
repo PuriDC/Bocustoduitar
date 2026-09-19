@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useContent } from "../content/ContentContext";
 import type { PageKey } from "../content/defaults";
+import { LANGS, draftsForLang, langKey, storageKeysFor, type Lang } from "../content/lang";
 import { applyOverrides, flatten, humanizePath } from "../content/paths";
 import { useAdminAuth } from "./AuthContext";
 import AdminSidebar, { ADMIN_PAGES } from "./components/AdminSidebar";
@@ -9,8 +10,10 @@ import SaveBar from "./components/SaveBar";
 import Toast, { type ToastState } from "./components/Toast";
 import PagePreview, { ROUTE_FOR_PAGE, type Viewport } from "./PagePreview";
 
+const LANG_LABEL: Record<Lang, string> = { en: "EN", th: "TH" };
+
 export default function AdminDashboard() {
-  const { content, overrides, refresh } = useContent();
+  const { content, overrides, lang, setLang, refresh } = useContent();
   const { user, logout, authedFetch } = useAdminAuth();
 
   const [page, setPage] = useState<PageKey>("home");
@@ -55,7 +58,9 @@ export default function AdminDashboard() {
   }, [searching, query, fields, sections, activeSection]);
 
   // The preview renders published content with unsaved edits applied on top.
-  const previewContent = useMemo(() => applyOverrides(content, drafts), [content, drafts]);
+  // `content` is already resolved to the editing language, so only the drafts
+  // belonging to that language are laid over it.
+  const previewContent = useMemo(() => applyOverrides(content, draftsForLang(drafts, lang)), [content, drafts, lang]);
 
   /** Sends the raw bytes; the server validates the type from magic bytes. */
   const uploadImage = useCallback(
@@ -72,11 +77,14 @@ export default function AdminDashboard() {
     [authedFetch]
   );
 
+  // Drafts carry the language suffix the database will store them under, so
+  // switching languages mid-edit keeps both sides' unsaved work intact.
   const setDraft = (key: string, published: string, next: string) => {
+    const stored = langKey(key, lang);
     setDrafts((prev) => {
       const copy = { ...prev };
-      if (next === published) delete copy[key];
-      else copy[key] = next;
+      if (next === published) delete copy[stored];
+      else copy[stored] = next;
       return copy;
     });
   };
@@ -123,15 +131,20 @@ export default function AdminDashboard() {
   }, [dirtyKeys.length]);
 
   const resetField = async (key: string) => {
+    const stored = langKey(key, lang);
     setDrafts((prev) => {
       const copy = { ...prev };
-      delete copy[key];
+      delete copy[stored];
       return copy;
     });
     if (!(key in overrides)) return;
     try {
-      const res = await authedFetch(`/api/content/${key}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("คืนค่าเดิมไม่สำเร็จ");
+      // English may still sit in a pre-i18n row with no language suffix, so
+      // every spelling the value could be stored under has to go.
+      for (const candidate of storageKeysFor(key, lang)) {
+        const res = await authedFetch(`/api/content/${candidate}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("คืนค่าเดิมไม่สำเร็จ");
+      }
       await refresh();
       setToast({ kind: "success", message: "คืนค่าข้อความต้นฉบับแล้ว" });
     } catch (err) {
@@ -161,9 +174,7 @@ export default function AdminDashboard() {
             <div className="min-w-0">
               <h1 className="text-[22px] font-bold tracking-tight text-slate-900">{activePage.label}</h1>
               <p className="text-[13px] text-slate-500 mt-0.5">
-                {page === "common"
-                  ? "แถบเมนูและท้ายเว็บ แสดงบนทุกหน้า"
-                  : `${fields.length} ช่องที่แก้ไขได้`}
+                {`${fields.length} ช่องที่แก้ไขได้`}
                 {editedHere > 0 && <span className="text-slate-400"> · แก้ไปแล้ว {editedHere} ช่อง</span>}
               </p>
             </div>
@@ -187,6 +198,29 @@ export default function AdminDashboard() {
                     <span className="material-symbols-outlined text-[18px] leading-none">close</span>
                   </button>
                 )}
+              </div>
+
+              <div
+                title="ภาษาที่กำลังแก้ไข"
+                className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5"
+              >
+                {LANGS.map((code) => {
+                  const dirtyHere = Object.keys(drafts).some((k) => k.endsWith(`.${code}`));
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => setLang(code)}
+                      className={`relative px-3 py-1.5 text-xs font-bold uppercase rounded-md transition ${
+                        lang === code ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50"
+                      }`}
+                    >
+                      {LANG_LABEL[code]}
+                      {dirtyHere && lang !== code && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
@@ -238,7 +272,7 @@ export default function AdminDashboard() {
           {!searching && (
             <div className="flex gap-1 overflow-x-auto -mb-px">
               {sections.map(([name, sectionFields]) => {
-                const dirtyHere = sectionFields.some((f) => f.key in drafts);
+                const dirtyHere = sectionFields.some((f) => langKey(f.key, lang) in drafts);
                 const isActive = activeSection === name;
                 return (
                   <button
@@ -291,7 +325,7 @@ export default function AdminDashboard() {
                       key={key}
                       fieldKey={key}
                       published={value}
-                      draft={drafts[key]}
+                      draft={drafts[langKey(key, lang)]}
                       isOverridden={key in overrides}
                       labelDepth={searching ? 1 : 2}
                       onChange={(next) => setDraft(key, value, next)}
@@ -327,7 +361,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
                 <div className="rounded-xl overflow-hidden shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5">
-                  <PagePreview page={page} content={previewContent} viewport={viewport} />
+                  <PagePreview page={page} content={previewContent} lang={lang} viewport={viewport} />
                 </div>
               </div>
             </div>

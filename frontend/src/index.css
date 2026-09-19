@@ -8,12 +8,14 @@
 
 /* ===== Admin portal =====
    The public site is dark and serif; the admin follows the Bocusto Luthier
-   admin instead — light canvas, Hanken Grotesk, Thai in Noto Sans Thai Looped.
+   admin instead — light canvas, Hanken Grotesk, Thai in Prompt. As on the
+   public side, Prompt sits behind the Latin face rather than replacing it:
+   Hanken Grotesk draws no Thai, so only Thai characters fall through to it.
    Scoped to .admin-portal so none of it leaks into the public pages, and the
    live preview inside the admin re-asserts the public fonts (see .site-preview). */
 .admin-portal,
 .admin-portal *:not(.material-symbols-outlined) {
-  font-family: "Hanken Grotesk", "Noto Sans Thai Looped", sans-serif;
+  font-family: "Hanken Grotesk", "Prompt", sans-serif;
 }
 
 .admin-portal .material-symbols-outlined {
@@ -79,10 +81,25 @@
 }
 
 .text-technical {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Space Grotesk", "Prompt", sans-serif;
   font-size: 10px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
+}
+
+/* ===== Thai =====
+   The typeface itself needs no rule here — Prompt is the last entry in every
+   stack, so Thai characters fall through to it wherever they appear.
+
+   Metrics do need one, and it applies wherever the language is Thai: the public
+   <html lang>, and the admin's live preview, which carries its own. Thai stacks
+   vowels and tone marks above and below the consonant they belong to, so the
+   0.35em tracking that makes the Latin labels read as engraved instead pulls
+   those marks away from their base letter. Ten-pixel Thai is unreadable for the
+   same reason. */
+:lang(th) .text-technical {
+  font-size: 12px;
+  letter-spacing: 0.06em;
 }
 
 html {

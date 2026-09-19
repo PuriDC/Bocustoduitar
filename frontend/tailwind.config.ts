@@ -33,10 +33,14 @@ export default {
         xl: "0.5rem",
         full: "9999px"
       },
+      // Prompt sits behind the Latin faces rather than replacing them: neither
+      // Cormorant Garamond nor Space Grotesk draws Thai, so the browser falls
+      // through to Prompt for those characters alone. A line that mixes the two
+      // scripts keeps each in its intended face.
       fontFamily: {
-        headline: ["Cormorant Garamond", "serif"],
-        body: ["Space Grotesk", "sans-serif"],
-        label: ["Space Grotesk", "sans-serif"]
+        headline: ["Cormorant Garamond", "Prompt", "serif"],
+        body: ["Space Grotesk", "Prompt", "sans-serif"],
+        label: ["Space Grotesk", "Prompt", "sans-serif"]
       }
     }
   },
