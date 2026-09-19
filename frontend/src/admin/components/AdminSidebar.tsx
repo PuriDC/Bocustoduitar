@@ -1,4 +1,19 @@
+import { useState } from "react";
 import type { PageKey } from "../../content/defaults";
+
+/**
+ * The sister site on the same VPS. Its admin is not a route — it is React state
+ * behind a pushState that never changes the URL — so `?page=admin` is a query
+ * its App.tsx reads on load to open the panel directly.
+ *
+ * The session does not travel: the token lives in localStorage, which is
+ * per-origin, so the same account has to sign in again on the other domain.
+ */
+const SISTER_SITE = {
+  name: "Bocusto Tonewood",
+  home: "https://bocustotonewood.com",
+  admin: "https://bocustotonewood.com/?page=admin"
+};
 
 export type AdminNavItem = { key: PageKey; label: string; icon: string; path: string };
 
@@ -27,6 +42,8 @@ type Props = {
 };
 
 export default function AdminSidebar({ current, onSelect, onLogout, editedPages, dirtyPages, username }: Props) {
+  const [sisterOpen, setSisterOpen] = useState(false);
+
   return (
     <aside className="fixed left-0 top-0 h-full w-[260px] z-50 flex flex-col bg-[#16181a] text-slate-300">
       <div className="px-5 pt-6 pb-5">
@@ -74,6 +91,45 @@ export default function AdminSidebar({ current, onSelect, onLogout, editedPages,
       </nav>
 
       <div className="px-3 pb-5 pt-3 border-t border-white/5 space-y-0.5">
+        <button
+          onClick={() => setSisterOpen((open) => !open)}
+          aria-expanded={sisterOpen}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5 transition text-left"
+        >
+          <span className="material-symbols-outlined text-[20px] leading-none shrink-0">swap_horiz</span>
+          <span className="flex-1 truncate">{SISTER_SITE.name}</span>
+          <span
+            className={`material-symbols-outlined text-[18px] leading-none shrink-0 transition-transform ${
+              sisterOpen ? "rotate-180" : ""
+            }`}
+          >
+            expand_more
+          </span>
+        </button>
+
+        {sisterOpen && (
+          <div className="pl-6 space-y-0.5">
+            <a
+              href={SISTER_SITE.home}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-slate-500 hover:text-white hover:bg-white/5 transition"
+            >
+              <span className="material-symbols-outlined text-[18px] leading-none">language</span>
+              หน้าเว็บไซต์
+            </a>
+            <a
+              href={SISTER_SITE.admin}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-slate-500 hover:text-white hover:bg-white/5 transition"
+            >
+              <span className="material-symbols-outlined text-[18px] leading-none">admin_panel_settings</span>
+              หน้าผู้ดูแลระบบ
+            </a>
+          </div>
+        )}
+
         <a
           href="/"
           target="_blank"
