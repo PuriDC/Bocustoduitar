@@ -1,4 +1,5 @@
 import { usePageContent } from "../content/ContentContext";
+import logo from "../assets/bocusto-logo.png";
 
 export default function Footer() {
   const { footer } = usePageContent("common");
@@ -6,7 +7,9 @@ export default function Footer() {
   return (
     <footer className="relative border-t border-primary/30 w-full bg-surface-container-lowest">
       <div className="max-w-screen-2xl mx-auto flex flex-col items-center py-20 px-8 text-center">
-        <div className="font-headline italic text-3xl text-primary mb-6">{footer.brand}</div>
+        {/* Larger than the navbar's: here the wordmark is the sign-off rather
+            than a corner mark, and it is the only brand element on the row. */}
+        <img src={logo} alt={footer.brand} width={155} height={60} className="h-12 md:h-14 w-auto mb-6" />
         <div className="flex flex-wrap justify-center gap-x-12 gap-y-4 mb-12">
           {footer.links.map((link, i) => (
             <a
