@@ -33,12 +33,18 @@ export default function Navbar() {
           <button className="hidden md:block text-technical text-on-surface-variant hover:text-primary transition-colors">
             {brand.languageToggle}
           </button>
-          <button className="text-primary hover:text-on-surface transition-colors active:scale-95 duration-200 relative">
+          <a
+            href="https://bocustotonewood.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Bocusto Tonewood"
+            className="text-primary hover:text-on-surface transition-colors active:scale-95 duration-200 relative"
+          >
             <span className="material-symbols-outlined">shopping_bag</span>
             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary text-background text-[8px] flex items-center justify-center rounded-full font-bold">
               {brand.cartCount}
             </span>
-          </button>
+          </a>
         </div>
       </div>
     </nav>

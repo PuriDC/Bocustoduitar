@@ -8,7 +8,7 @@ pm2**, not Docker:
 | Domain | bocustotonewood.com | the new domain |
 | Frontend | `/var/www/bocustotonewood/frontend` (nginx root) | `/var/www/bocustoguitars/frontend` |
 | Backend | pm2 app `tonewood-backend`, port 5000 | pm2 app `guitars-backend`, port 5100 |
-| Database | MySQL on the same host, `bocusto_luthier` | same MySQL, `bocusto_guitars` |
+| Database | MySQL on the same host, `bocustotonewood` | same MySQL, `bocusto_guitars` |
 
 `docker-compose.yml` in this repo is for **local development only**. Production
 follows the steps below.
@@ -18,13 +18,13 @@ follows the steps below.
 ## Using the same admin accounts as bocustotonewood.com
 
 The three administrators registered at bocustotonewood.com (`@Developer`,
-`@auttapol99`, `@admin`) live in `bocusto_luthier.users` on the VPS. This site
+`@auttapol99`, `@admin`) live in `bocustotonewood.users` on the VPS. This site
 signs people in against that table directly — no copying, no second password.
 
 The login checks, in order:
 
 1. `bocusto_guitars.users` — accounts belonging only to this site
-2. `bocusto_luthier.users` — the shared administrators, when `SHARED_USERS_DB` is set
+2. `bocustotonewood.users` — the shared administrators, when `SHARED_USERS_DB` is set
 
 Either a username or an email address is accepted, and the comparison is
 case-insensitive, so `Developer`, `developer` and `p@gmail.com` all resolve to
@@ -34,22 +34,28 @@ are refused with 403.
 **Three things must be true for it to work:**
 
 1. **Same MySQL server.** `DB_HOST` must point at the instance that holds
-   `bocusto_luthier` — on the VPS that is `localhost`. A local Docker MySQL has
+   `bocustotonewood` — on the VPS that is `localhost`. A local Docker MySQL has
    its own, different copy of the accounts.
 
 2. **Read access to the shared table.** If the backend connects as a
    least-privilege MySQL user rather than `root`, grant it explicitly:
 
    ```sql
-   GRANT SELECT ON bocusto_luthier.users TO 'bocusto_app'@'localhost';
+   GRANT SELECT ON bocustotonewood.users TO 'bocusto_app'@'localhost';
    FLUSH PRIVILEGES;
    ```
 
-   `GET /api/health` reports whether this worked:
+   `GET /api/health/details` reports whether this worked. It needs an
+   administrator token — the public `/api/health` deliberately says nothing
+   beyond `{"status":"ok"}`, so a passer-by cannot read off the database state
+   or count the administrator accounts:
 
    ```json
-   { "sharedUsers": { "status": "ok", "database": "bocusto_luthier", "admins": 3 } }
+   { "sharedUsers": { "status": "ok", "database": "bocustotonewood", "admins": 3 } }
    ```
+
+   The bootstrap and deploy scripts print the same information on the server,
+   where no token is needed.
 
    `"status": "unreachable"` means the grant is missing — logins would otherwise
    fail with a misleading "incorrect username or password".
@@ -93,7 +99,7 @@ DB_USER=<same user the Luthier backend uses, or one with access to both>
 DB_PASSWORD=<...>
 DB_NAME=bocusto_guitars
 
-SHARED_USERS_DB=bocusto_luthier
+SHARED_USERS_DB=bocustotonewood
 
 # Copy verbatim from /var/www/bocustotonewood/backend/.env
 JWT_SECRET=<the Luthier backend's JWT_SECRET>
@@ -142,15 +148,31 @@ Then `certbot --nginx -d bocustoguitars.com` and `nginx -t && systemctl reload n
 ```bash
 cd /opt/bocusto-guitars-src && git pull
 cd frontend && npm ci && npm run build && rsync -a --delete dist/ /var/www/bocustoguitars/frontend/
-cd ../backend && rsync -a --delete --exclude .env --exclude node_modules . /var/www/bocustoguitars/backend/
+cd ../backend && rsync -a --delete --exclude .env --exclude node_modules --exclude uploads . /var/www/bocustoguitars/backend/
 cd /var/www/bocustoguitars/backend && npm ci --omit=dev && pm2 restart guitars-backend
 ```
 
-`.env` is deliberately excluded — it is the only copy of the production secrets.
+`.env` is excluded because it is the only copy of the production secrets, and
+`uploads/` because it holds images an administrator added that exist nowhere
+else — without the exclusion `--delete` would erase them on every deploy.
+
+In practice use `./deploy.sh`, which does all of the above plus a file and
+database backup, and checks the site afterwards.
+
+## Server maintenance
+
+| Script | What it does |
+|---|---|
+| `scripts/harden-vps.sh` | closes 3306, 5000 and 5100 at the firewall, verifying the SSH rule first |
+| `scripts/update-nginx.sh` | adds the security headers, `/uploads/` and a real robots.txt to the live config without disturbing certbot's SSL |
+| `scripts/mysql-localhost.sh` | binds MySQL to loopback (restarts MySQL — brief outage) |
+| `scripts/system-update.sh` | applies Ubuntu updates and refuses to reboot unless pm2 will restart the sites |
+
+Each takes `--dry-run` (or `--check`) first.
 
 ## Site-only administrators
 
-Anyone in `bocusto_luthier.users` with `role = 'admin'` can already sign in. To
+Anyone in `bocustotonewood.users` with `role = 'admin'` can already sign in. To
 add an account that belongs to this site alone (a useful break-glass login if
 the Luthier database is ever moved):
 

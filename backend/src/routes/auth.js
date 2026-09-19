@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool, { SHARED_USERS_DB } from "../config/db.js";
 import { requireAuth } from "../middleware/auth.js";
+import { clearRateLimit, loginIdentityLimiter, loginLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ async function findUser(identifier) {
   return null;
 }
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, loginIdentityLimiter, async (req, res) => {
   const { identifier, password } = req.body ?? {};
 
   if (typeof identifier !== "string" || typeof password !== "string" || !identifier || !password) {
@@ -44,6 +45,10 @@ router.post("/login", async (req, res) => {
     if (user.role !== "admin") {
       return res.status(403).json({ error: "Administrator access required." });
     }
+
+    // A correct password should not leave the caller closer to a lockout.
+    clearRateLimit(req);
+    clearRateLimit(req, (r) => String(r.body?.identifier ?? "").trim().toLowerCase() || "anonymous");
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },

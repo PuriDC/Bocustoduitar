@@ -92,8 +92,12 @@ fi
 # --- 2. backend -------------------------------------------------------------
 
 say "Installing the backend to $API"
-mkdir -p "$API" "$WEB"
-rsync -a --delete --exclude node_modules --exclude .env "$SRC/backend/" "$API/"
+mkdir -p "$API" "$WEB" "$API/uploads"
+# nginx reads the uploaded images directly.
+chmod 755 "$API/uploads"
+# uploads/ holds images an administrator added and exists only on the server —
+# without excluding it, --delete would wipe them on every deploy.
+rsync -a --delete --exclude node_modules --exclude .env --exclude uploads "$SRC/backend/" "$API/"
 cd "$API"
 npm ci --omit=dev
 
@@ -184,9 +188,41 @@ server {
     index index.html;
     client_max_body_size 1M;
 
+    # Images come from Google's CDN and the webfonts from Google Fonts, which
+    # is why img-src and style-src reach past 'self'.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # Keep the editor out of search results.
+    location = /admin {
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        try_files /index.html =404;
+    }
+
+    location = /robots.txt {
+        default_type text/plain;
+        return 200 "User-agent: *\nDisallow: /admin\n";
+    }
+
+    # Images written by the upload endpoint. The filenames are content hashes,
+    # so they can be cached indefinitely.
+    location /uploads/ {
+        alias $API/uploads/;
+        access_log off;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files \$uri =404;
+    }
+
+    # A missing file with an extension is a real 404; anything else is a
+    # client-side route. Without this, every typo answered 200 with the SPA.
+    location ~* \\.(js|css|map|png|jpe?g|gif|webp|svg|ico|woff2?|txt|xml|json)\$ {
+        try_files \$uri =404;
+    }
 
     # Client-side routing: /about, /models, /admin all serve index.html.
     location / {

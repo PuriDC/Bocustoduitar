@@ -1,11 +1,12 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { formLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-router.post("/subscribe", async (req, res) => {
+router.post("/subscribe", formLimiter, async (req, res) => {
   const { email } = req.body ?? {};
 
   if (typeof email !== "string" || !EMAIL_RE.test(email)) {

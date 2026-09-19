@@ -57,6 +57,21 @@ export default function AdminDashboard() {
   // The preview renders published content with unsaved edits applied on top.
   const previewContent = useMemo(() => applyOverrides(content, drafts), [content, drafts]);
 
+  /** Sends the raw bytes; the server validates the type from magic bytes. */
+  const uploadImage = useCallback(
+    async (file: File): Promise<string> => {
+      const res = await authedFetch("/api/uploads", {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "อัปโหลดไม่สำเร็จ");
+      return data.url as string;
+    },
+    [authedFetch]
+  );
+
   const setDraft = (key: string, published: string, next: string) => {
     setDrafts((prev) => {
       const copy = { ...prev };
@@ -281,6 +296,7 @@ export default function AdminDashboard() {
                       labelDepth={searching ? 1 : 2}
                       onChange={(next) => setDraft(key, value, next)}
                       onReset={() => void resetField(key)}
+                      onUpload={uploadImage}
                     />
                   ))}
                 </div>

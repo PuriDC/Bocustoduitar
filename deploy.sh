@@ -44,13 +44,32 @@ done
 
 say "Backing up the live site"
 mkdir -p "$BACKUP_DIR"
-BACKUP="$BACKUP_DIR/guitars-$(date +%F-%H%M%S).tar.gz"
+STAMP="$(date +%F-%H%M%S)"
+BACKUP="$BACKUP_DIR/guitars-$STAMP.tar.gz"
+DB_BACKUP="$BACKUP_DIR/guitars-db-$STAMP.sql.gz"
+
+env_get() { grep -E "^$1=" "$2" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"; }
+
 if [ -n "$DRY_RUN" ]; then
-  echo "(dry run) would write $BACKUP"
+  echo "(dry run) would write $BACKUP and $DB_BACKUP"
 else
   tar czf "$BACKUP" -C /var/www bocustoguitars
   echo "    $BACKUP"
+
+  # The files alone are not a backup: every edit an administrator has published
+  # lives in the database, not on disk.
+  DB_USER="$(env_get DB_USER "$API/.env")"
+  DB_PASSWORD="$(env_get DB_PASSWORD "$API/.env")"
+  DB_NAME="$(env_get DB_NAME "$API/.env")"
+  if MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction -u "$DB_USER" "${DB_NAME:-bocusto_guitars}" 2>/dev/null | gzip > "$DB_BACKUP"; then
+    echo "    $DB_BACKUP"
+  else
+    rm -f "$DB_BACKUP"
+    warn "database dump failed — continuing, but this deploy has no data backup"
+  fi
+
   ls -1t "$BACKUP_DIR"/guitars-*.tar.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f
+  ls -1t "$BACKUP_DIR"/guitars-db-*.sql.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f
 fi
 
 # --- 2. frontend ------------------------------------------------------------
@@ -68,7 +87,9 @@ if [ -z "$DRY_RUN" ]; then chmod -R a+rX "$WEB"; fi
 # --- 3. backend -------------------------------------------------------------
 
 say "Updating the backend"
-rsync -a --delete $DRY_RUN --exclude node_modules --exclude .env "$SRC/backend/" "$API/"
+# uploads/ holds images an administrator added and exists only on the server —
+# without excluding it, --delete would wipe them on every deploy.
+rsync -a --delete $DRY_RUN --exclude node_modules --exclude .env --exclude uploads "$SRC/backend/" "$API/"
 
 if [ -z "$DRY_RUN" ]; then
   cd "$API"
@@ -77,10 +98,13 @@ if [ -z "$DRY_RUN" ]; then
   # Additive, idempotent: new tables only, nothing dropped.
   if [ -f "$API/schema.sql" ]; then
     say "Applying schema.sql (CREATE IF NOT EXISTS only)"
-    DB_USER="$(grep -E '^DB_USER=' "$API/.env" | head -1 | cut -d= -f2-)"
-    DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$API/.env" | head -1 | cut -d= -f2-)"
+    env_get() { grep -E "^$1=" "$2" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"; }
+    DB_USER="$(env_get DB_USER "$API/.env")"
+    DB_PASSWORD="$(env_get DB_PASSWORD "$API/.env")"
+    # MYSQL_PWD rather than -p: a password on the command line is readable in
+    # `ps` by every account on the box for as long as the query runs.
     if [ -n "$DB_PASSWORD" ]; then
-      mysql -u "$DB_USER" -p"$DB_PASSWORD" < "$API/schema.sql"
+      MYSQL_PWD="$DB_PASSWORD" mysql -u "$DB_USER" < "$API/schema.sql"
     else
       mysql -u "$DB_USER" < "$API/schema.sql"
     fi

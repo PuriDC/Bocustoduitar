@@ -1,6 +1,7 @@
 import { Router } from "express";
 import pool from "../config/db.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { writeLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -8,8 +9,22 @@ const KEY_RE = /^[a-z0-9]+(?:\.[a-z0-9_-]+)+$/i;
 const MAX_VALUE_LENGTH = 20000;
 
 /**
+ * Segments that address an object's own machinery rather than content.
+ * Nothing can be written through them today โ€” the frontend only overwrites
+ * leaves that are already strings โ€” but keeping them out of the database means
+ * that guard is not the only thing standing between a stored key and
+ * prototype pollution.
+ */
+const FORBIDDEN_SEGMENTS = new Set(["__proto__", "prototype", "constructor"]);
+
+function isSafeKey(key) {
+  if (!KEY_RE.test(key)) return false;
+  return key.split(".").every((segment) => !FORBIDDEN_SEGMENTS.has(segment.toLowerCase()));
+}
+
+/**
  * Only overrides live in the database. Keys the admin has never touched are
- * absent, and the frontend falls back to its shipped defaults — so the site
+ * absent, and the frontend falls back to its shipped defaults โ€” so the site
  * renders correctly against an empty table or an unreachable database.
  */
 router.get("/", async (_req, res) => {
@@ -24,7 +39,7 @@ router.get("/", async (_req, res) => {
   }
 });
 
-router.put("/", requireAdmin, async (req, res) => {
+router.put("/", requireAdmin, writeLimiter, async (req, res) => {
   const updates = req.body;
   if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
     return res.status(400).json({ error: "Expected an object of key/value pairs." });
@@ -36,7 +51,7 @@ router.put("/", requireAdmin, async (req, res) => {
   }
 
   for (const [key, value] of entries) {
-    if (!KEY_RE.test(key)) {
+    if (!isSafeKey(key)) {
       return res.status(400).json({ error: `Invalid content key: ${key}` });
     }
     if (typeof value !== "string") {
@@ -70,9 +85,9 @@ router.put("/", requireAdmin, async (req, res) => {
 });
 
 /** Drops an override so the field falls back to its shipped default. */
-router.delete("/:key", requireAdmin, async (req, res) => {
+router.delete("/:key", requireAdmin, writeLimiter, async (req, res) => {
   const { key } = req.params;
-  if (!KEY_RE.test(key)) {
+  if (!isSafeKey(key)) {
     return res.status(400).json({ error: "Invalid content key." });
   }
   try {

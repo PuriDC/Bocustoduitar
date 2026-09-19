@@ -9,6 +9,12 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:4000",
         changeOrigin: true
+      },
+      // Uploaded images are written by the API and served by nginx in
+      // production; in development the API serves them from the same origin.
+      "/uploads": {
+        target: "http://localhost:4000",
+        changeOrigin: true
       }
     }
   }

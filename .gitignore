@@ -5,6 +5,10 @@ dist/
 .claude/
 .mcp.json
 
+# Images added through the admin. They exist only on the server, which is also
+# why both rsync calls exclude this directory.
+backend/uploads/
+
 # Holds JWT_SECRET and database credentials — never commit it.
 .env
 .env.local

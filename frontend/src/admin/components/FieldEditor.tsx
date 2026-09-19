@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { humanizePath, isImageField, isLongText } from "../../content/paths";
 
 const INPUT =
@@ -17,6 +18,8 @@ type Props = {
   labelDepth: number;
   onChange: (next: string) => void;
   onReset: () => void;
+  /** Uploads the file and resolves to the URL it is served from. */
+  onUpload: (file: File) => Promise<string>;
 };
 
 export default function FieldEditor({
@@ -26,18 +29,32 @@ export default function FieldEditor({
   isOverridden,
   labelDepth,
   onChange,
-  onReset
+  onReset,
+  onUpload
 }: Props) {
   const value = draft ?? published;
   const isDirty = draft !== undefined;
   const label = humanizePath(fieldKey.split(".").slice(labelDepth).join(".")) || humanizePath(fieldKey);
 
-  const readFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") onChange(reader.result);
-    };
-    reader.readAsDataURL(file);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  /**
+   * The file is stored on the server and only its URL goes into the field.
+   * Inlining it as a data URL used to blow past the value-length limit for
+   * anything above roughly 15 KB, and would have shipped every image to every
+   * visitor inside the content JSON.
+   */
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setUploadError("");
+    try {
+      onChange(await onUpload(file));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -87,23 +104,35 @@ export default function FieldEditor({
               placeholder="วาง URL รูปภาพ หรือเลือกไฟล์"
               onChange={(e) => onChange(e.target.value)}
             />
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 cursor-pointer transition">
-                <span className="material-symbols-outlined text-base leading-none">upload</span>
-                อัปโหลด
+            <div className="flex items-center gap-2 flex-wrap">
+              <label
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition ${
+                  uploading ? "opacity-50 cursor-wait" : "hover:bg-slate-50 cursor-pointer"
+                }`}
+              >
+                <span
+                  className={`material-symbols-outlined text-base leading-none ${uploading ? "animate-spin" : ""}`}
+                >
+                  {uploading ? "progress_activity" : "upload"}
+                </span>
+                {uploading ? "กำลังอัปโหลด..." : "อัปโหลด"}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
                   className="hidden"
+                  disabled={uploading}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) readFile(file);
+                    // Reset so picking the same file twice still fires onChange.
+                    e.target.value = "";
+                    if (file) void handleFile(file);
                   }}
                 />
               </label>
-              {value.startsWith("data:image") && (
-                <span className="text-[11px] font-semibold text-emerald-600">ไฟล์จากเครื่อง</span>
+              {value.startsWith("/uploads/") && (
+                <span className="text-[11px] font-semibold text-emerald-600">อัปโหลดแล้ว</span>
               )}
+              {uploadError && <span className="text-[11px] font-semibold text-rose-600">{uploadError}</span>}
             </div>
           </div>
         </div>

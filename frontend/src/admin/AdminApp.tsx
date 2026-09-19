@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AdminAuthProvider, useAdminAuth } from "./AuthContext";
 import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
@@ -20,6 +21,23 @@ function AdminGate() {
 }
 
 export default function AdminApp() {
+  // The admin lives on the public domain, so keep it out of search results and
+  // set the language to match its Thai interface.
+  useEffect(() => {
+    const previousLang = document.documentElement.lang;
+    document.documentElement.lang = "th";
+
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex, nofollow";
+    document.head.appendChild(meta);
+
+    return () => {
+      document.documentElement.lang = previousLang;
+      meta.remove();
+    };
+  }, []);
+
   return (
     <AdminAuthProvider>
       <AdminGate />

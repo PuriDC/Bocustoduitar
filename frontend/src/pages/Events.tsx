@@ -8,7 +8,10 @@ export default function Events() {
   // Categories come from the events themselves, so renaming one in the admin
   // panel updates the filter row without any code change.
   const filters = useMemo(() => [list.allLabel, ...new Set(events.map((e) => e.category))], [list.allLabel, events]);
-  const active = filter || list.allLabel;
+  // Fall back to "all" if the chosen category no longer exists — an
+  // administrator renaming one would otherwise leave the list stuck on empty
+  // with nothing on screen explaining why.
+  const active = filter && filters.includes(filter) ? filter : list.allLabel;
   const visible = active === list.allLabel ? events : events.filter((e) => e.category === active);
 
   return (
